@@ -1,0 +1,62 @@
+name: benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Measured runs per language per benchmark"
+        default: "5"
+        required: false
+
+env:
+  SWIFT_VERSION: "6.4"
+
+jobs:
+  bench:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Swift ${{ env.SWIFT_VERSION }}
+        uses: SwiftyLab/setup-swift@latest
+        with:
+          swift-version: ${{ env.SWIFT_VERSION }}
+
+      - name: Install latest stable Rust
+        shell: bash
+        run: |
+          rustup update stable
+          rustup default stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Toolchain versions
+        shell: bash
+        run: |
+          swift --version
+          rustc --version
+          cargo --version
+          python3 --version
+
+      # The exact same entry point a developer runs locally. The harness appends
+      # its Markdown tables to $GITHUB_STEP_SUMMARY automatically.
+      - name: Run all benchmarks
+        shell: bash
+        run: python3 run-all.py --runs "${{ github.event.inputs.runs || 5 }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.os }}
+          path: results/
+          if-no-files-found: warn

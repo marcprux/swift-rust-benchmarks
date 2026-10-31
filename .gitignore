@@ -1,0 +1,14 @@
+# build output
+.build/
+target/
+*.swp
+.DS_Store
+__pycache__/
+
+# benchmark output (upload as CI artifacts instead)
+results/
+
+# SwiftPM / Xcode local state
+.swiftpm/
+*.xcodeproj
+Package.resolved

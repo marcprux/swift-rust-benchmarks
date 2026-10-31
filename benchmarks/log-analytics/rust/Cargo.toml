@@ -1,0 +1,11 @@
+[package]
+name = "log-analytics"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "log-analytics"
+path = "src/main.rs"
+
+[dependencies]
+benchkit = { path = "../../../common/rust/benchkit" }

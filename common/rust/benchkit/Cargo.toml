@@ -1,0 +1,7 @@
+[package]
+name = "benchkit"
+version = "0.1.0"
+edition = "2021"
+description = "Dependency-free support code shared by the Rust side of every benchmark"
+
+[dependencies]
