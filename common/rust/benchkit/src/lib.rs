@@ -45,6 +45,38 @@ pub fn fnv1a64(bytes: &[u8]) -> u64 {
     h
 }
 
+/// Streaming FNV-1a for hashing structures without first rendering them to text.
+pub struct Fnv1a(u64);
+
+impl Default for Fnv1a {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Fnv1a {
+    pub fn new() -> Self {
+        Self(0xCBF2_9CE4_8422_2325)
+    }
+
+    #[inline]
+    pub fn byte(&mut self, b: u8) {
+        self.0 ^= b as u64;
+        self.0 = self.0.wrapping_mul(0x0000_0100_0000_01B3);
+    }
+
+    #[inline]
+    pub fn update(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.byte(b);
+        }
+    }
+
+    pub fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
 /// Minimal `--key value` / `--key=value` / `--flag` command-line parser.
 pub struct Args {
     values: HashMap<String, String>,

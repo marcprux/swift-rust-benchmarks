@@ -1,0 +1,11 @@
+[package]
+name = "document-tree"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "document-tree"
+path = "src/main.rs"
+
+[dependencies]
+benchkit = { path = "../../../common/rust/benchkit" }

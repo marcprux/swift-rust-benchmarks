@@ -3,17 +3,11 @@
 // The Rust crate at `common/rust/benchkit` is a line-for-line mirror of this
 // module so that both sides of a benchmark pair measure and report identically.
 // Deliberately avoids Foundation so that the measurements reflect the Swift
-// standard library and runtime alone.
+// standard library and runtime alone. The companion CBenchKit target holds the
+// two OS-specific primitives (peak RSS and stderr output) as C, the Swift
+// equivalent of the `extern "C"` block in the Rust crate.
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif os(Windows)
-import WinSDK
-#endif
+import CBenchKit
 
 /// SplitMix64: a tiny, fast, deterministic PRNG. Both languages implement the
 /// exact same sequence so that a given seed produces identical workloads.
@@ -50,6 +44,26 @@ public func fnv1a64<C: Sequence>(_ bytes: C) -> UInt64 where C.Element == UInt8 
         h = h &* 0x0000_0100_0000_01B3
     }
     return h
+}
+
+/// Streaming FNV-1a for hashing structures without first rendering them to text.
+public struct Fnv1a {
+    @usableFromInline var state: UInt64 = 0xCBF2_9CE4_8422_2325
+
+    public init() {}
+
+    @inlinable @inline(__always)
+    public mutating func byte(_ b: UInt8) {
+        state ^= UInt64(b)
+        state = state &* 0x0000_0100_0000_01B3
+    }
+
+    @inlinable
+    public mutating func update<S: Sequence>(_ bytes: S) where S.Element == UInt8 {
+        for b in bytes { byte(b) }
+    }
+
+    public var value: UInt64 { state }
 }
 
 /// Minimal `--key value` / `--key=value` / `--flag` command-line parser.
@@ -110,22 +124,9 @@ public struct Stopwatch {
 }
 
 /// Peak resident set size of the current process, in bytes (0 if unavailable).
+/// Implemented in the CBenchKit target (`getrusage` / `GetProcessMemoryInfo`).
 public func peakRSSBytes() -> UInt64 {
-    #if os(Windows)
-    var pmc = PROCESS_MEMORY_COUNTERS()
-    pmc.cb = DWORD(MemoryLayout<PROCESS_MEMORY_COUNTERS>.size)
-    guard GetProcessMemoryInfo(GetCurrentProcess(), &pmc, pmc.cb) else { return 0 }
-    return UInt64(pmc.PeakWorkingSetSize)
-    #else
-    var usage = rusage()
-    // RUSAGE_SELF == 0 on every supported platform.
-    guard getrusage(0, &usage) == 0 else { return 0 }
-    #if canImport(Darwin)
-    return UInt64(usage.ru_maxrss) // bytes
-    #else
-    return UInt64(usage.ru_maxrss) * 1024 // kilobytes
-    #endif
-    #endif
+    benchkit_peak_rss_bytes()
 }
 
 /// Collects the benchmark's measurements and prints them as a single JSON line.
@@ -171,17 +172,19 @@ public struct Report {
     }
 }
 
-/// Formats a Double with a fixed number of decimals without Foundation.
+/// Formats a Double with a fixed number of decimals without Foundation (and
+/// without libm: `rounded()` would require linking `-lm` on Linux).
 public func formatFixed(_ value: Double, decimals: Int) -> String {
-    var scale = 1.0
+    var scale: Int64 = 1
     for _ in 0..<decimals { scale *= 10 }
-    let scaled = (value * scale).rounded()
-    let whole = Int64(scaled / scale)
-    var frac = Int64(scaled) - whole * Int64(scale)
-    if frac < 0 { frac = -frac }
+    let magnitude = value < 0 ? -value : value
+    let scaled = Int64(magnitude * Double(scale) + 0.5)
+    let whole = scaled / scale
+    let frac = scaled % scale
     var fracText = String(frac)
     while fracText.count < decimals { fracText = "0" + fracText }
-    return decimals == 0 ? String(whole) : "\(whole).\(fracText)"
+    let sign = value < 0 && scaled > 0 ? "-" : ""
+    return decimals == 0 ? "\(sign)\(whole)" : "\(sign)\(whole).\(fracText)"
 }
 
 /// Zero-padded hexadecimal rendering of a 64-bit value.
@@ -204,14 +207,13 @@ public func appendHex16(_ value: UInt64, to s: inout String) {
 public struct StandardError: TextOutputStream {
     public init() {}
     public mutating func write(_ string: String) {
-        #if os(Windows)
-        _ = fputs(string, stderr)
-        #else
         var s = string
         s.withUTF8 { buf in
-            _ = fwrite(buf.baseAddress, 1, buf.count, stderr)
+            guard let base = buf.baseAddress else { return }
+            base.withMemoryRebound(to: CChar.self, capacity: buf.count) {
+                benchkit_write_stderr($0, buf.count)
+            }
         }
-        #endif
     }
 }
 

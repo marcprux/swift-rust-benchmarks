@@ -38,7 +38,11 @@ run-all.py                 run every benchmark (CI entry point)
 tools/harness.py           shared build / run / compare / report logic
 common/
   rust/benchkit/           Rust support crate (timing, peak RSS, PRNG, JSON)
-  swift/BenchKit/          Swift support package (mirror of the above)
+  swift/BenchKit/          Swift support package (mirror of the above); its
+                           CBenchKit target holds the two OS-specific calls
+                           (peak RSS, stderr) as C, since psapi is not in the
+                           WinSDK module and C's `stderr` global is rejected by
+                           Swift 6 strict concurrency on Linux
 benchmarks/
   log-analytics/           one directory per benchmark pair
     README.md              what it does, knobs, findings
@@ -93,6 +97,7 @@ of the two medians (values above 1 mean Swift took longer or used more).
 | benchmark | what it exercises |
 |---|---|
 | [log-analytics](benchmarks/log-analytics/) | string building, byte-level parsing into owned records, hash-map aggregation, bulk deallocation |
+| [document-tree](benchmarks/document-tree/) | a DOM of reference-counted class nodes vs owned enum nodes: build, serialize, parse, traverse, mutate in place, free |
 
 More are planned; see the roadmap below.
 
@@ -100,15 +105,13 @@ More are planned; see the roadmap below.
 
 Each new pair should isolate a different memory-management pattern:
 
-1. **Document tree** - build, traverse and mutate a tree of heap-allocated
-   nodes (Swift classes vs Rust `Box`/`Vec`), the textbook ARC-vs-ownership case.
-2. **Borrowed views** - a variant of log-analytics where records keep slices of
+1. **Borrowed views** - a variant of log-analytics where records keep slices of
    the input (Rust `&str` lifetimes vs Swift `Substring` sharing storage).
-3. **Shared ownership** - a graph with genuinely shared nodes (`Rc`/`Arc`
+2. **Shared ownership** - a graph with genuinely shared nodes (`Rc`/`Arc`
    vs class references), where Rust also pays for reference counting.
-4. **Request simulation** - a long-running loop allocating and freeing
+3. **Request simulation** - a long-running loop allocating and freeing
    per-request state, measuring steady-state throughput and allocator churn.
-5. **Concurrent aggregation** - the same work spread over threads (Swift
+4. **Concurrent aggregation** - the same work spread over threads (Swift
    structured concurrency vs Rust scoped threads), where ARC becomes atomic.
 
 ## CI
