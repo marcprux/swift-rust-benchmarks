@@ -1,4 +1,4 @@
-# swift-vs-rust
+# swift-rust-benchmarks
 
 Side-by-side Swift and Rust implementations of realistic workloads, built to
 compare execution time and memory behaviour of the two languages, and in
@@ -9,7 +9,9 @@ Each benchmark is a pair of small programs that do the same job the way a
 competent engineer in each language would write it, plus a script that builds
 both, runs them with identical parameters, checks that they produced identical
 results, and prints a comparison table. The same script runs on a developer
-machine and in GitHub Actions on macOS, Linux and Windows.
+machine and in GitHub Actions on macOS, Linux and Windows. The latest results
+from all three are published as a report at
+<https://marcprux.github.io/swift-rust-benchmarks/>.
 
 ## Ground rules
 
@@ -36,6 +38,8 @@ machine and in GitHub Actions on macOS, Linux and Windows.
 ```
 run-all.py                 run every benchmark (CI entry point)
 tools/harness.py           shared build / run / compare / report logic
+tools/report.py            renders results/*.json into an HTML report of
+                           Vega-Lite charts, one section per machine
 common/
   rust/benchkit/           Rust support crate (timing, peak RSS, PRNG, JSON)
   swift/BenchKit/          Swift support package (mirror of the above); its
@@ -66,7 +70,18 @@ Requirements: Swift 6.x, Rust stable, Python 3.
 
 # options common to every benchmark
 ./benchmarks/log-analytics/run.py --help
+
+# one HTML page of charts from everything under results/, opened in the browser
+./tools/report.py --open
+
+# the same page plus the raw JSON, laid out as a static site (what CI publishes)
+./tools/report.py results other-machine-results --site site
 ```
+
+The report embeds one Vega-Lite specification per chart and draws them with
+[vega-embed](https://github.com/vega/vega-embed) loaded from a CDN when the page
+is opened, so viewing it needs network access; the tables under "Every number"
+are plain HTML and work without it.
 
 Every `run.py` accepts `--runs`, `--warmup`, `--lang swift|rust|both`,
 `--skip-build`, `--verbose`, `--results-dir` and `--summary <file>` (a Markdown
@@ -118,8 +133,18 @@ generation.
 
 ## CI
 
-`.github/workflows/bench.yml` runs `python3 run-all.py --runs 5` on
-`ubuntu-latest`, `macos-latest` and `windows-latest`, writes the tables to the
-job summary, and uploads `results/` as an artifact. Hosted runners are noisy
-shared machines; treat CI numbers as indicative and local numbers as the
-reference.
+`.github/workflows/bench.yml` has three jobs:
+
+1. `bench` runs `python3 run-all.py --runs 5` on `ubuntu-latest`, `macos-latest`
+   and `windows-latest`, writes the tables to the job summary, and uploads each
+   machine's `results/` as an artifact.
+2. `report` downloads the three artifacts into one directory, runs
+   `tools/report.py --site site` over them, and uploads the page and the raw
+   JSON as the `report` artifact. It runs even if a matrix leg failed, so the
+   page covers whichever machines finished.
+3. `deploy` publishes that page to GitHub Pages on pushes to `main`. The
+   repository's Pages setting must be "GitHub Actions"; pull requests build the
+   report but do not deploy it.
+
+Hosted runners are noisy shared machines; treat CI numbers as indicative and
+local numbers as the reference.
