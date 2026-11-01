@@ -15,6 +15,9 @@ extern "C" {
 /// Peak resident set size of the current process, in bytes (0 if unavailable).
 uint64_t benchkit_peak_rss_bytes(void);
 
+/// Number of online logical processors (0 if unavailable).
+uint32_t benchkit_cpu_count(void);
+
 /// Writes `count` bytes to the standard error stream.
 void benchkit_write_stderr(const char *bytes, size_t count);
 

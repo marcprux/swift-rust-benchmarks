@@ -45,7 +45,7 @@ class Knob:
 @dataclass
 class Column:
     """An extra numeric field from the binaries' JSON line to show in the table,
-    after the phase timings. `unit` is "count" or "bytes"."""
+    after the phase timings. `unit` is "count", "bytes", "ms" or "ratio"."""
 
     key: str
     label: str
@@ -287,7 +287,14 @@ def main(name: str, knobs, bench_dir, exe=None, columns=()):
         if col == "peak_rss_bytes":
             return fmt_mb(value)
         if col in extra:
-            return fmt_mb(value) if extra[col].unit == "bytes" else f"{value:,.0f}"
+            unit = extra[col].unit
+            if unit == "bytes":
+                return fmt_mb(value)
+            if unit == "ratio":
+                return f"{value:.2f}x"
+            if unit == "ms":
+                return fmt_ms(value)
+            return f"{value:,.0f}"
         return fmt_ms(value)
 
     header = ["language", *[pretty(c) for c in table_columns], "binary (KB)"]
@@ -303,7 +310,11 @@ def main(name: str, knobs, bench_dir, exe=None, columns=()):
         s, r = medians["swift"], medians["rust"]
         cells = ["swift / rust"]
         for c in table_columns:
-            cells.append(fmt_ratio(s[c], r[c]))
+            # A timing below the timer's resolution makes a meaningless ratio.
+            if c.endswith("_ms") and r[c] < 0.1:
+                cells.append("n/a")
+            else:
+                cells.append(fmt_ratio(s[c], r[c]))
         cells.append(fmt_ratio(s["binary_bytes"], r["binary_bytes"]))
         rows.append(cells)
 

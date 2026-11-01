@@ -16,8 +16,15 @@ uint64_t benchkit_peak_rss_bytes(void) {
     }
     return (uint64_t)pmc.PeakWorkingSetSize;
 }
+
+uint32_t benchkit_cpu_count(void) {
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    return (uint32_t)info.dwNumberOfProcessors;
+}
 #else
 #include <sys/resource.h>
+#include <unistd.h>
 
 uint64_t benchkit_peak_rss_bytes(void) {
     struct rusage usage;
@@ -29,6 +36,11 @@ uint64_t benchkit_peak_rss_bytes(void) {
 #else
     return (uint64_t)usage.ru_maxrss * 1024; /* kilobytes */
 #endif
+}
+
+uint32_t benchkit_cpu_count(void) {
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+    return n > 0 ? (uint32_t)n : 0;
 }
 #endif
 

@@ -39,10 +39,10 @@ tools/harness.py           shared build / run / compare / report logic
 common/
   rust/benchkit/           Rust support crate (timing, peak RSS, PRNG, JSON)
   swift/BenchKit/          Swift support package (mirror of the above); its
-                           CBenchKit target holds the two OS-specific calls
-                           (peak RSS, stderr) as C, since psapi is not in the
-                           WinSDK module and C's `stderr` global is rejected by
-                           Swift 6 strict concurrency on Linux
+                           CBenchKit target holds the OS-specific calls (peak
+                           RSS, CPU count, stderr) as C, since psapi is not in
+                           the WinSDK module and C's `stderr` global is rejected
+                           by Swift 6 strict concurrency on Linux
 benchmarks/
   log-analytics/           one directory per benchmark pair
     README.md              what it does, knobs, findings
@@ -89,6 +89,9 @@ measurements:
 | peak RSS | peak resident set size reported by the OS for the process (`getrusage` / `GetProcessMemoryInfo`) |
 | binary | size of the release executable |
 
+Some benchmarks add columns of their own (requests per second, parallel
+speedup, ...); their READMEs define them.
+
 Numbers are the median over `--runs` runs. The `swift / rust` row is the ratio
 of the two medians (values above 1 mean Swift took longer or used more).
 
@@ -100,18 +103,17 @@ of the two medians (values above 1 mean Swift took longer or used more).
 | [document-tree](benchmarks/document-tree/) | a DOM of reference-counted class nodes vs owned enum nodes: build, serialize, parse, traverse, mutate in place, free |
 | [order-graph](benchmarks/order-graph/) | genuinely shared entities (orders referencing customers and products): class references vs an index-addressed arena, including deleting orders and sweeping orphaned entities |
 | [request-churn](benchmarks/request-churn/) | a web-service hot path: zero-copy request parsing, session cache with eviction, JSON responses; steady-state throughput and footprint growth |
+| [sensor-rollup](benchmarks/sensor-rollup/) | the control: a telemetry pipeline over arrays of plain structs with no heap objects, strings or reference counting, where both compilers should be at parity |
+| [parallel-ledger](benchmarks/parallel-ledger/) | shared read-only records touched from every core: class references with atomic retain/release vs `&T` borrows, serial and parallel, with the Swift element loop and index loop measured separately |
 
-More are planned; see the roadmap below.
+Read the others against `sensor-rollup`: it shows how close the two compilers
+are when memory management is out of the picture, so the gaps elsewhere can be
+attributed to heap objects, strings and reference counting rather than to code
+generation.
 
 ## Roadmap
 
-Each new pair should isolate a different memory-management pattern:
-
-1. **Concurrent aggregation** - the same work spread over threads (Swift
-   structured concurrency vs Rust scoped threads), where ARC becomes atomic.
-2. **Borrowed views** - a variant of log-analytics where records keep slices of
-   the input (Rust `&str` lifetimes vs Swift `Substring` sharing storage).
-3. **Shared ownership, Rc variant** - order-graph with Rust using
+1. **Shared ownership, Rc variant** - order-graph with Rust using
    `Rc<RefCell<T>>` instead of an arena, so both languages reference count.
 
 ## CI

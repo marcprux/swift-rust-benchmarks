@@ -1,0 +1,11 @@
+[package]
+name = "sensor-rollup"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "sensor-rollup"
+path = "src/main.rs"
+
+[dependencies]
+benchkit = { path = "../../../common/rust/benchkit" }

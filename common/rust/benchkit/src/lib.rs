@@ -134,6 +134,11 @@ impl Stopwatch {
     }
 }
 
+/// Number of hardware threads the process may use (at least 1).
+pub fn available_parallelism() -> usize {
+    std::thread::available_parallelism().map_or(1, |n| n.get())
+}
+
 /// Peak resident set size of the current process, in bytes (0 if unavailable).
 pub fn peak_rss_bytes() -> u64 {
     sys::peak_rss_bytes()
@@ -253,6 +258,12 @@ impl Report {
     }
 
     pub fn ms(&mut self, key: &str, value: f64) -> &mut Self {
+        self.fields.push((key.to_string(), format!("{value:.3}")));
+        self
+    }
+
+    /// A non-timing floating-point value (a ratio, a rate), three decimals.
+    pub fn num(&mut self, key: &str, value: f64) -> &mut Self {
         self.fields.push((key.to_string(), format!("{value:.3}")));
         self
     }

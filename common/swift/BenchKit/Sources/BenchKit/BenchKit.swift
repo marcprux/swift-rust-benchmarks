@@ -129,6 +129,11 @@ public func peakRSSBytes() -> UInt64 {
     benchkit_peak_rss_bytes()
 }
 
+/// Number of hardware threads the process may use (at least 1).
+public func availableParallelism() -> Int {
+    max(Int(benchkit_cpu_count()), 1)
+}
+
 /// Collects the benchmark's measurements and prints them as a single JSON line.
 /// The harness reads the last line of stdout that starts with `{`.
 public struct Report {
@@ -153,6 +158,13 @@ public struct Report {
 
     @discardableResult
     public mutating func ms(_ key: String, _ value: Double) -> Self {
+        fields.append((key, formatFixed(value, decimals: 3)))
+        return self
+    }
+
+    /// A non-timing floating-point value (a ratio, a rate), three decimals.
+    @discardableResult
+    public mutating func num(_ key: String, _ value: Double) -> Self {
         fields.append((key, formatFixed(value, decimals: 3)))
         return self
     }

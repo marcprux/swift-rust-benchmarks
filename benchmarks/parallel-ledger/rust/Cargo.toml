@@ -1,0 +1,11 @@
+[package]
+name = "parallel-ledger"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "parallel-ledger"
+path = "src/main.rs"
+
+[dependencies]
+benchkit = { path = "../../../common/rust/benchkit" }
