@@ -1,0 +1,11 @@
+[package]
+name = "request-churn"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "request-churn"
+path = "src/main.rs"
+
+[dependencies]
+benchkit = { path = "../../../common/rust/benchkit" }

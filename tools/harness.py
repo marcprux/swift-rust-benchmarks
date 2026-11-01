@@ -42,6 +42,16 @@ class Knob:
     help: str
 
 
+@dataclass
+class Column:
+    """An extra numeric field from the binaries' JSON line to show in the table,
+    after the phase timings. `unit` is "count" or "bytes"."""
+
+    key: str
+    label: str
+    unit: str = "count"
+
+
 # ---------------------------------------------------------------------------------
 # helpers
 
@@ -181,7 +191,7 @@ def fmt_ratio(a, b):
 # main
 
 
-def main(name: str, knobs, bench_dir, exe=None):
+def main(name: str, knobs, bench_dir, exe=None, columns=()):
     bench_dir = Path(bench_dir).resolve()
     exe = exe or name
 
@@ -258,31 +268,41 @@ def main(name: str, knobs, bench_dir, exe=None):
     # Medians per language.
     sample = next(iter(results.values()))[0]
     phases = phase_keys(sample)
-    columns = ["wall_ms", "total_ms", *phases, "peak_rss_bytes"]
+    extra = {c.key: c for c in columns}
+    table_columns = ["wall_ms", "total_ms", *phases, *extra, "peak_rss_bytes"]
     medians = {}
     for lang, runs in results.items():
-        medians[lang] = {c: median([r[c] for r in runs]) for c in columns}
+        medians[lang] = {c: median([r[c] for r in runs]) for c in table_columns}
         medians[lang]["binary_bytes"] = binaries[lang].stat().st_size
 
     # Markdown table.
     def pretty(col):
+        if col in extra:
+            return extra[col].label
         return {"wall_ms": "wall (ms)", "total_ms": "in-process (ms)",
                 "peak_rss_bytes": "peak RSS (MB)"}.get(
             col, col[:-3].replace("_", " ") + " (ms)")
 
-    header = ["language", *[pretty(c) for c in columns], "binary (KB)"]
+    def cell(col, value):
+        if col == "peak_rss_bytes":
+            return fmt_mb(value)
+        if col in extra:
+            return fmt_mb(value) if extra[col].unit == "bytes" else f"{value:,.0f}"
+        return fmt_ms(value)
+
+    header = ["language", *[pretty(c) for c in table_columns], "binary (KB)"]
     rows = []
     for lang in languages:
         m = medians[lang]
         cells = [f"{lang} {toolchains[lang]}"]
-        for c in columns:
-            cells.append(fmt_mb(m[c]) if c == "peak_rss_bytes" else fmt_ms(m[c]))
+        for c in table_columns:
+            cells.append(cell(c, m[c]))
         cells.append(f"{m['binary_bytes'] / 1024:,.0f}")
         rows.append(cells)
     if len(languages) == 2:
         s, r = medians["swift"], medians["rust"]
         cells = ["swift / rust"]
-        for c in columns:
+        for c in table_columns:
             cells.append(fmt_ratio(s[c], r[c]))
         cells.append(fmt_ratio(s["binary_bytes"], r["binary_bytes"]))
         rows.append(cells)

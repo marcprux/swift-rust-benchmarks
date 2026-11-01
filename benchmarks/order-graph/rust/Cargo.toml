@@ -1,0 +1,11 @@
+[package]
+name = "order-graph"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "order-graph"
+path = "src/main.rs"
+
+[dependencies]
+benchkit = { path = "../../../common/rust/benchkit" }
